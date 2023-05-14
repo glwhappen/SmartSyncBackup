@@ -98,13 +98,15 @@ def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modif
 def backup_dirs(dirs, backup_dir):
     total_stats = {'copied': 0, 'deleted': 0, 'modified': 0}  # 初始化总的统计信息
     for dir in dirs:  # 遍历所有需要备份的目录
+        dir_name = os.path.basename(dir)  # 获取源目录的名称
+        dir_backup_path = os.path.join(backup_dir, dir_name)  # 在备份路径上添加源目录的名称
         for root, subdirs, files in os.walk(dir):  # 使用os.walk获取目录中的所有文件和子目录
             if 'backups.gitignore' in files:  # 如果目录中存在.gitignore文件
                 gitignore_path = os.path.join(root, 'backups.gitignore')  # 获取.gitignore文件的完整路径
-                write_info_to_gitignore(gitignore_path, root, backup_dir)  # 向.gitignore文件中添加备份信息
+                write_info_to_gitignore(gitignore_path, root, dir_backup_path)  # 向.gitignore文件中添加备份信息
                 ignore_patterns = read_gitignore(gitignore_path)  # 读取.gitignore文件获取需要忽略的文件和文件夹
                 rel_path = os.path.relpath(root, dir)  # 计算相对路径
-                backup_path = os.path.join(backup_dir, rel_path)  # 根据相对路径计算备份路径
+                backup_path = os.path.join(dir_backup_path, rel_path)  # 根据相对路径计算备份路径
                 stats = copy_dir(root, backup_path, ignore_patterns)  # 拷贝目录并获取统计信息
                 total_stats['copied'] += stats['copied']  # 更新总的拷贝文件数量
                 total_stats['deleted'] += stats['deleted']  # 更新总的删除文件数量
@@ -112,6 +114,6 @@ def backup_dirs(dirs, backup_dir):
     print(f'Copied {total_stats["copied"]} files. Deleted {total_stats["deleted"]} files. Modified {total_stats["modified"]} files.')  # 打印总的统计信息
 
 
-dirs = ['C:\\happen\\拷贝测试\\待备份的目录'] # 需要备份的目录列表
+dirs = ['C:\\happen\\拷贝测试\\待备份的目录', 'C:\happen\照片'] # 需要备份的目录列表
 backup_dir = 'C:\\happen\\拷贝测试\\备份后的位置' # 备份文件夹
 backup_dirs(dirs, backup_dir) # 调用backup_dirs函数进行备份
