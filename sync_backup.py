@@ -7,6 +7,14 @@ import shutil
 import fnmatch
 import datetime
 import hashlib
+import yaml # pip install pyyaml
+
+
+## 函数：读取配置文件
+def read_config(config_file):
+    with open(config_file, 'r', encoding='utf-8') as file:
+        config = yaml.safe_load(file)
+    return config['dirs'], config['backup_dir']
 
 # 函数：获取文件的MD5哈希值，用于比较文件是否有所改动
 def get_file_hash(filepath):
@@ -46,9 +54,12 @@ def should_ignore(path, ignore_patterns):
     return False
 
 # 函数：拷贝目录并忽略特定文件，同时统计新增、删除和修改的文件数量
-def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modified': 0}):
+def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modified': 0, 'checked': 0}, counter={'count': 0}):
     names = os.listdir(src)  # 获取源文件夹中的文件和文件夹列表
     os.makedirs(dst, exist_ok=True)  # 确保目标文件夹存在
+
+
+
 
     ignored_names = set()  # 存放需要忽略的文件和文件夹名称
 
@@ -62,6 +73,16 @@ def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modif
     for name in names:  # 遍历源文件夹中的所有文件和文件夹
         if name in ignored_names:  # 如果文件或文件夹在忽略列表中
             continue  # 跳过此次循环
+
+        # 每处理一个文件或目录，就增加counter
+        counter['count'] += 1
+        stats['checked'] += 1
+
+        # 如果counter达到100，就输出进度，然后重置counter
+        if counter['count'] >= 100:
+            print(
+                f'Checked {stats["checked"]} files/directories. Copied {stats["copied"]} files. Deleted {stats["deleted"]} files. Modified {stats["modified"]} files.')
+            counter['count'] = 0
 
         srcname = os.path.join(src, name)  # 获取源文件/文件夹的完整路径
         dstname = os.path.join(dst, name)  # 获取目标文件/文件夹的完整路径
@@ -96,7 +117,7 @@ def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modif
 
 # 函数：备份多个目录到指定的备份文件夹
 def backup_dirs(dirs, backup_dir):
-    total_stats = {'copied': 0, 'deleted': 0, 'modified': 0}  # 初始化总的统计信息
+    total_stats = {'copied': 0, 'deleted': 0, 'modified': 0, 'checked': 0}  # 初始化总的统计信息
     for dir in dirs:  # 遍历所有需要备份的目录
         dir_name = os.path.basename(dir)  # 获取源目录的名称
         dir_backup_path = os.path.join(backup_dir, dir_name)  # 在备份路径上添加源目录的名称
@@ -111,9 +132,10 @@ def backup_dirs(dirs, backup_dir):
                 total_stats['copied'] += stats['copied']  # 更新总的拷贝文件数量
                 total_stats['deleted'] += stats['deleted']  # 更新总的删除文件数量
                 total_stats['modified'] += stats['modified']  # 更新总的修改文件数量
-    print(f'Copied {total_stats["copied"]} files. Deleted {total_stats["deleted"]} files. Modified {total_stats["modified"]} files.')  # 打印总的统计信息
+                total_stats['checked'] += stats['checked']  # 更新总的检查目录数量
+
+    print(f'Checked {total_stats["checked"]} files/directories. Copied {total_stats["copied"]} files. Deleted {total_stats["deleted"]} files. Modified {total_stats["modified"]} files.')  # 打印总的统计信息
 
 
-dirs = ['C:\\happen\\拷贝测试\\待备份的目录', 'C:\happen\照片'] # 需要备份的目录列表
-backup_dir = 'C:\\happen\\拷贝测试\\备份后的位置' # 备份文件夹
+dirs, backup_dir = read_config('config.yml') # 读取配置文件
 backup_dirs(dirs, backup_dir) # 调用backup_dirs函数进行备份

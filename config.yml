@@ -1,0 +1,4 @@
+dirs:
+  - C:\happen\拷贝测试\待备份的目录
+  - C:\happen\照片
+backup_dir: C:\happen\拷贝测试\备份后的位置
