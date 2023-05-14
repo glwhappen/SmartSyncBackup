@@ -1,6 +1,5 @@
 """
 文件同步脚本
-
 """
 
 import os
@@ -9,6 +8,7 @@ import fnmatch
 import datetime
 import hashlib
 
+# 函数：获取文件的MD5哈希值，用于比较文件是否有所改动
 def get_file_hash(filepath):
     hasher = hashlib.md5()
     with open(filepath, 'rb') as afile:
@@ -16,11 +16,13 @@ def get_file_hash(filepath):
         hasher.update(buf)
     return hasher.hexdigest()
 
+# 函数：读取gitignore文件，获取需要忽略的文件和文件夹的列表
 def read_gitignore(gitignore_path):
     with open(gitignore_path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
     return [line.strip() for line in lines if line.strip() and not line.startswith('#')]
 
+# 函数：向gitignore文件中添加当前备份的信息
 def write_info_to_gitignore(gitignore_path, src, dst):
     info = f"# Backup Information\n# Original Directory: {src}\n# Backup Directory: {dst}\n# Backup Time: {datetime.datetime.now()}\n# Backup Information End\n\n"
     with open(gitignore_path, 'r+', encoding='utf-8') as f:
@@ -36,78 +38,80 @@ def write_info_to_gitignore(gitignore_path, src, dst):
         f.write(info + content)
         f.truncate()
 
-
+# 函数：根据ignore_patterns判断路径是否应被忽略
 def should_ignore(path, ignore_patterns):
     for pattern in ignore_patterns:
         if fnmatch.fnmatch(path, pattern):
             return True
     return False
 
+# 函数：拷贝目录并忽略特定文件，同时统计新增、删除和修改的文件数量
 def copy_dir(src, dst, ignore_patterns, stats={'copied': 0, 'deleted': 0, 'modified': 0}):
-    names = os.listdir(src)
-    os.makedirs(dst, exist_ok=True)
+    names = os.listdir(src)  # 获取源文件夹中的文件和文件夹列表
+    os.makedirs(dst, exist_ok=True)  # 确保目标文件夹存在
 
-    ignored_names = set()
+    ignored_names = set()  # 存放需要忽略的文件和文件夹名称
 
-    if ignore_patterns:
-        for name in names:
-            if should_ignore(name, ignore_patterns):
-                ignored_names.add(name)
+    if ignore_patterns:  # 如果有忽略规则
+        for name in names:  # 遍历源文件夹中的所有文件和文件夹
+            if should_ignore(name, ignore_patterns):  # 如果文件或文件夹符合忽略规则
+                ignored_names.add(name)  # 将其添加到忽略集合中
 
-    dst_names = set(os.listdir(dst))
+    dst_names = set(os.listdir(dst))  # 获取目标文件夹中的文件和文件夹列表
 
-    for name in names:
-        if name in ignored_names:
-            continue
+    for name in names:  # 遍历源文件夹中的所有文件和文件夹
+        if name in ignored_names:  # 如果文件或文件夹在忽略列表中
+            continue  # 跳过此次循环
 
-        srcname = os.path.join(src, name)
-        dstname = os.path.join(dst, name)
+        srcname = os.path.join(src, name)  # 获取源文件/文件夹的完整路径
+        dstname = os.path.join(dst, name)  # 获取目标文件/文件夹的完整路径
 
         try:
-            if os.path.isdir(srcname):
-                copy_dir(srcname, dstname, ignore_patterns, stats)
-            else:
-                if name not in dst_names:
-                    shutil.copy2(srcname, dstname)
-                    stats['copied'] += 1
+            if os.path.isdir(srcname):  # 如果是文件夹
+                copy_dir(srcname, dstname, ignore_patterns, stats)  # 递归拷贝文件夹
+            else:  # 如果是文件
+                if name not in dst_names:  # 如果目标文件夹中不存在该文件
+                    shutil.copy2(srcname, dstname)  # 拷贝文件
+                    stats['copied'] += 1  # 记录拷贝的文件数量
                     print(f'Copied: {srcname} to {dstname}')
-                elif get_file_hash(srcname) != get_file_hash(dstname):
-                    shutil.copy2(srcname, dstname)
-                    if name != 'backups.gitignore':
-                        stats['modified'] += 1
+                elif get_file_hash(srcname) != get_file_hash(dstname):  # 如果文件存在但内容有所改变
+                    shutil.copy2(srcname, dstname)  # 覆盖拷贝文件
+                    if name != 'backups.gitignore':  # 忽略.gitignore文件的更改
+                        stats['modified'] += 1  # 记录修改的文件数量
                         print(f'modified: {srcname} to {dstname}')
         except Exception as err:
-            print(f'Unable to copy {srcname}. Reason: {err}')
+            print(f'Unable to copy {srcname}. Reason: {err}')  # 打印无法拷贝的文件和原因
 
-    for name in dst_names:
-        if name not in names:
-            stats['deleted'] += 1
-            delname = os.path.join(dst, name)
-            if os.path.isdir(delname):
-                shutil.rmtree(delname)
-            else:
-                os.remove(delname)
-            print(f'Deleted: {delname}')
+    for name in dst_names:  # 遍历目标文件夹中的所有文件和文件夹
+        if name not in names:  # 如果目标文件夹中的文件/文件夹在源文件夹中不存在
+            stats['deleted'] += 1  # 记录删除的文件/文件夹数量
+            delname = os.path.join(dst, name)  # 获取要删除的文件/文件夹的完整路径
+            if os.path.isdir(delname):  # 如果是文件夹
+                shutil.rmtree(delname)  # 删除文件夹
+            else:  # 如果是文件
+                os.remove(delname)  # 删除文件
+            print(f'Deleted: {delname}')  # 打印删除的文件/文件夹信息
 
-    return stats
+    return stats  # 返回统计信息
 
+# 函数：备份多个目录到指定的备份文件夹
 def backup_dirs(dirs, backup_dir):
-    total_stats = {'copied': 0, 'deleted': 0, 'modified': 0}
-    for dir in dirs:
-        for root, subdirs, files in os.walk(dir):
-            if 'backups.gitignore' in files:
-                gitignore_path = os.path.join(root, 'backups.gitignore')
-                write_info_to_gitignore(gitignore_path, root, backup_dir)
-                ignore_patterns = read_gitignore(gitignore_path)
-                rel_path = os.path.relpath(root, dir)
-                backup_path = os.path.join(backup_dir, rel_path)
-                stats = copy_dir(root, backup_path, ignore_patterns)
-                total_stats['copied'] += stats['copied']
-                total_stats['deleted'] += stats['deleted']
-                total_stats['modified'] += stats['modified']
-    print(f'Copied {total_stats["copied"]} files. Deleted {total_stats["deleted"]} files. Modified {total_stats["modified"]} files.')
+    total_stats = {'copied': 0, 'deleted': 0, 'modified': 0}  # 初始化总的统计信息
+    for dir in dirs:  # 遍历所有需要备份的目录
+        for root, subdirs, files in os.walk(dir):  # 使用os.walk获取目录中的所有文件和子目录
+            if 'backups.gitignore' in files:  # 如果目录中存在.gitignore文件
+                gitignore_path = os.path.join(root, 'backups.gitignore')  # 获取.gitignore文件的完整路径
+                write_info_to_gitignore(gitignore_path, root, backup_dir)  # 向.gitignore文件中添加备份信息
+                ignore_patterns = read_gitignore(gitignore_path)  # 读取.gitignore文件获取需要忽略的文件和文件夹
+                rel_path = os.path.relpath(root, dir)  # 计算相对路径
+                backup_path = os.path.join(backup_dir, rel_path)  # 根据相对路径计算备份路径
+                stats = copy_dir(root, backup_path, ignore_patterns)  # 拷贝目录并获取统计信息
+                total_stats['copied'] += stats['copied']  # 更新总的拷贝文件数量
+                total_stats['deleted'] += stats['deleted']  # 更新总的删除文件数量
+                total_stats['modified'] += stats['modified']  # 更新总的修改文件数量
+    print(f'Copied {total_stats["copied"]} files. Deleted {total_stats["deleted"]} files. Modified {total_stats["modified"]} files.')  # 打印总的统计信息
 
 
-dirs = ['C:\\happen\\拷贝测试\\待备份的目录']  # directories to backup
-backup_dir = 'C:\\happen\\拷贝测试\\备份后的位置'  # backup directory
-backup_dirs(dirs, backup_dir)
+dirs = ['C:\\happen\\拷贝测试\\待备份的目录'] # 需要备份的目录列表
+backup_dir = 'C:\\happen\\拷贝测试\\备份后的位置' # 备份文件夹
+backup_dirs(dirs, backup_dir) # 调用backup_dirs函数进行备份
